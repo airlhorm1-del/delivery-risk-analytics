@@ -1,0 +1,162 @@
+version: 2
+
+models:
+  # ---------- Star schema (Power BI connects to these) ----------
+  - name: fct_orders
+    description: >
+      One row per order (all 99,441). Route, stage timings, delivery outcome, money in BRL and EUR,
+      review, and outside conditions. Filter on is_in_kpi_window for headline numbers.
+    data_tests:
+      - dbt_utils.equal_rowcount:
+          arguments:
+            compare_model: ref('stg_olist__orders')
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "revenue_at_risk_eur <= gmv_eur and late_gmv_eur <= gmv_eur"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "late_cause is not null"
+          config:
+            where: "is_late"
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+      - name: purchase_date
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_day
+      - name: customer_state
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_states')
+                field: state_code
+      - name: primary_seller_id
+        description: Seller with the highest item value in the order (null for the 775 orders without items).
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_sellers')
+                field: seller_id
+      - name: route
+        description: Seller state -> customer state, e.g. "SP -> RJ".
+      - name: delivery_outcome
+        description: On time / Late / Overdue, not delivered / Cancelled / Delivered, date missing / Open, not yet due.
+        data_tests: [not_null]
+      - name: is_late
+        description: Delivered after the promised date (compared as dates). Null for orders not delivered.
+      - name: days_late
+        description: Calendar days after the promised date; 0 when on time or not delivered.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: late_cause
+        description: For late orders, whether the seller handed over after its deadline or the delay came after hand-over.
+      - name: approval_hours
+        description: Purchase to payment approval. Boleto (bank slip) payments take about a day.
+      - name: handover_days
+        description: Payment approval to hand-over to the carrier (seller's stage). Null when timestamps are out of order.
+      - name: transit_days
+        description: Hand-over to delivery (carrier's stage). Null when timestamps are out of order.
+      - name: gmv_brl
+        description: Gross merchandise value = item prices + freight, in Brazilian reais.
+      - name: gmv_eur
+        description: GMV converted at the ECB EUR/BRL rate of the purchase date.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+      - name: brl_per_eur
+        data_tests: [not_null]
+      - name: is_low_review
+        description: Customer gave 1 or 2 stars.
+      - name: late_gmv_eur
+        description: GMV of orders delivered late.
+      - name: revenue_at_risk_reason
+        description: "'Late and rated 1-2 stars' or 'Overdue, never delivered'; null otherwise."
+      - name: revenue_at_risk_eur
+        description: >
+          GMV where the promise was broken AND there is evidence of damage: the order arrived late and
+          the customer gave 1-2 stars, or it was never delivered although its promised date had passed.
+      - name: weekday_holidays_first_10_days
+        description: Weekday public or bank holidays in the customer's state during the 10 days from purchase.
+      - name: heavy_rain_days_first_7_days_transit
+        description: Days with 20 mm+ rain at the customer's state capital in the 7 days from hand-over.
+      - name: is_in_kpi_window
+        description: Purchased between 2017-01-01 and 2018-08-31 (the complete months).
+
+  - name: fct_order_items
+    description: One row per order item, for seller and product analysis. Delivery results are copied from the order.
+    columns:
+      - name: order_item_key
+        data_tests: [unique, not_null]
+      - name: product_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_products')
+                field: product_id
+      - name: seller_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_sellers')
+                field: seller_id
+
+  - name: dim_date
+    description: One row per day, 2016-09-01 to 2018-12-31, with nationwide holidays and the EUR/BRL rate.
+    columns:
+      - name: date_day
+        data_tests: [unique, not_null]
+      - name: brl_per_eur
+        data_tests: [not_null]
+
+  - name: dim_sellers
+    columns:
+      - name: seller_id
+        data_tests: [unique, not_null]
+
+  - name: dim_products
+    columns:
+      - name: product_id
+        data_tests: [unique, not_null]
+      - name: category_name_en
+        data_tests: [not_null]
+
+  - name: dim_states
+    columns:
+      - name: state_code
+        data_tests: [unique, not_null]
+
+  # ---------- Analysis tables ----------
+  - name: mart_monthly_kpis
+    description: Headline KPIs per purchase month in the KPI window, with 3-month rolling late rate.
+    columns:
+      - name: month_start
+        data_tests: [unique, not_null]
+
+  - name: mart_route_performance
+    description: One row per seller-state -> customer-state route, ranked by revenue at risk (routes with 30+ delivered orders).
+    columns:
+      - name: route
+        data_tests: [unique, not_null]
+      - name: p90_actual_days
+        description: 90% of delivered orders on this route arrived within this many days.
+
+  - name: mart_seller_performance
+    description: One row per seller with reliability, hand-over discipline and revenue at risk; watchlist = late rate at least 2x the platform's (30+ delivered orders).
+    columns:
+      - name: seller_id
+        data_tests: [unique, not_null]
+
+  - name: mart_late_drivers
+    description: >
+      Late rate with and without each condition, raw and adjusted (same customer state and same week),
+      plus how many days the condition adds to the delivery and to the promise.
+    columns:
+      - name: driver
+        data_tests: [unique, not_null]

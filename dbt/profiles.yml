@@ -1,0 +1,21 @@
+# Two targets for the same dbt project:
+#   dev  = DuckDB file on this laptop (no account needed; used for development and CI)
+#   prod = Google BigQuery (needs `gcloud auth application-default login` and GCP_PROJECT_ID set)
+# Run dbt from inside this dbt/ folder: `uv run dbt build` (dev) or `uv run dbt build --target prod`.
+delivery_risk:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('DUCKDB_PATH', '../data/warehouse/delivery_risk.duckdb') }}"
+      schema: main
+      threads: 4
+    prod:
+      type: bigquery
+      method: oauth
+      project: "{{ env_var('GCP_PROJECT_ID', 'set-GCP_PROJECT_ID') }}"
+      dataset: analytics
+      location: "{{ env_var('BQ_LOCATION', 'EU') }}"
+      threads: 4
+      job_execution_timeout_seconds: 300
+      priority: interactive

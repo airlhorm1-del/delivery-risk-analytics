@@ -1,0 +1,126 @@
+version: 2
+
+models:
+  - name: int_fx_rates_daily
+    description: One EUR/BRL rate per calendar day; weekends and holidays carry the last published rate.
+    columns:
+      - name: rate_date
+        data_tests: [unique, not_null]
+      - name: brl_per_eur
+        data_tests: [not_null]
+
+  - name: int_state_holidays
+    description: One row per state per holiday date (nationwide holidays for every state, regional ones only where they apply).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [state_code, holiday_date]
+
+  - name: int_zip_centroids
+    columns:
+      - name: zip_prefix
+        data_tests: [unique, not_null]
+
+  - name: int_order_items_summary
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+      - name: primary_seller_id
+        description: The seller with the highest item value in the order.
+        data_tests: [not_null]
+
+  - name: int_order_payments_summary
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+
+  - name: int_order_reviews_latest
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+
+  - name: int_order_timeline
+    description: The delivery rules. See the unit tests below for the exact behaviour on edge cases.
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+      - name: delivery_outcome
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['On time', 'Late', 'Overdue, not delivered', 'Cancelled', 'Delivered, date missing', 'Open, not yet due']
+      - name: late_cause
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['Seller shipped late', 'After hand-over (carrier or promise)', 'Unclear (timestamp issue)']
+
+  - name: int_order_context
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+
+unit_tests:
+  - name: delivery_outcome_follows_the_business_rules
+    description: >
+      On the promised day counts as on time; the day after is late. A late order is the seller's fault
+      only if the parcel reached the carrier after the seller's deadline. Undelivered orders are overdue
+      only once their promised date has passed before the data cut-off (2018-10-17).
+    model: int_order_timeline
+    given:
+      - input: ref('stg_olist__orders')
+        rows:
+          - {order_id: on_promised_day, customer_id: c1, order_status: delivered, purchased_at: "2018-01-01 10:00:00", approved_at: "2018-01-01 10:20:00", shipped_at: "2018-01-03 09:00:00", delivered_at: "2018-01-10 18:30:00", promised_date: "2018-01-10"}
+          - {order_id: one_day_late, customer_id: c2, order_status: delivered, purchased_at: "2018-01-01 10:00:00", approved_at: "2018-01-01 10:20:00", shipped_at: "2018-01-03 09:00:00", delivered_at: "2018-01-11 08:00:00", promised_date: "2018-01-10"}
+          - {order_id: seller_shipped_late, customer_id: c3, order_status: delivered, purchased_at: "2018-01-01 10:00:00", approved_at: "2018-01-01 10:20:00", shipped_at: "2018-01-08 09:00:00", delivered_at: "2018-01-13 12:00:00", promised_date: "2018-01-10"}
+          - {order_id: lost_in_transit, customer_id: c4, order_status: shipped, purchased_at: "2018-01-01 10:00:00", approved_at: "2018-01-01 10:20:00", shipped_at: "2018-01-03 09:00:00", delivered_at: null, promised_date: "2018-01-20"}
+          - {order_id: not_due_yet, customer_id: c5, order_status: shipped, purchased_at: "2018-10-10 10:00:00", approved_at: "2018-10-10 10:20:00", shipped_at: "2018-10-12 09:00:00", delivered_at: null, promised_date: "2018-11-05"}
+          - {order_id: cancelled, customer_id: c6, order_status: canceled, purchased_at: "2018-01-01 10:00:00", approved_at: null, shipped_at: null, delivered_at: null, promised_date: "2018-01-20"}
+      - input: ref('int_order_items_summary')
+        rows:
+          - {order_id: on_promised_day, seller_ship_by_at: "2018-01-05 23:59:59"}
+          - {order_id: one_day_late, seller_ship_by_at: "2018-01-05 23:59:59"}
+          - {order_id: seller_shipped_late, seller_ship_by_at: "2018-01-05 23:59:59"}
+          - {order_id: lost_in_transit, seller_ship_by_at: "2018-01-05 23:59:59"}
+          - {order_id: not_due_yet, seller_ship_by_at: "2018-10-15 23:59:59"}
+    expect:
+      rows:
+        - {order_id: on_promised_day, delivery_outcome: "On time", is_late: false, days_late: 0, late_cause: null, promised_days: 9, actual_days: 9}
+        - {order_id: one_day_late, delivery_outcome: "Late", is_late: true, days_late: 1, late_cause: "After hand-over (carrier or promise)", promised_days: 9, actual_days: 10}
+        - {order_id: seller_shipped_late, delivery_outcome: "Late", is_late: true, days_late: 3, late_cause: "Seller shipped late", promised_days: 9, actual_days: 12}
+        - {order_id: lost_in_transit, delivery_outcome: "Overdue, not delivered", is_late: null, days_late: 0, late_cause: null, promised_days: 19, actual_days: null}
+        - {order_id: not_due_yet, delivery_outcome: "Open, not yet due", is_late: null, days_late: 0, late_cause: null, promised_days: 26, actual_days: null}
+        - {order_id: cancelled, delivery_outcome: "Cancelled", is_late: null, days_late: 0, late_cause: null, promised_days: 19, actual_days: null}
+
+  - name: weekend_fx_rate_carries_forward_friday_rate
+    description: The ECB publishes no rate on Saturday or Sunday; those days must use Friday's rate.
+    model: int_fx_rates_daily
+    overrides:
+      vars:
+        calendar_start: "2017-01-06"
+        calendar_end: "2017-01-09"
+    given:
+      - input: ref('stg_external__fx_rates')
+        rows:
+          - {rate_date: "2017-01-06", brl_per_eur: 3.40}
+          - {rate_date: "2017-01-09", brl_per_eur: 3.45}
+    expect:
+      rows:
+        - {rate_date: "2017-01-06", brl_per_eur: 3.40, is_published_rate: true}
+        - {rate_date: "2017-01-07", brl_per_eur: 3.40, is_published_rate: false}
+        - {rate_date: "2017-01-08", brl_per_eur: 3.40, is_published_rate: false}
+        - {rate_date: "2017-01-09", brl_per_eur: 3.45, is_published_rate: true}
+
+  - name: latest_review_wins_when_an_order_has_several
+    model: int_order_reviews_latest
+    given:
+      - input: ref('stg_olist__order_reviews')
+        rows:
+          - {review_id: r_old, order_id: o1, review_score: 1, has_comment: true, review_sent_date: "2018-01-10", review_answered_at: "2018-01-11 09:00:00"}
+          - {review_id: r_new, order_id: o1, review_score: 4, has_comment: false, review_sent_date: "2018-01-15", review_answered_at: "2018-01-16 09:00:00"}
+          - {review_id: r_only, order_id: o2, review_score: 5, has_comment: false, review_sent_date: "2018-01-10", review_answered_at: "2018-01-10 20:00:00"}
+    expect:
+      rows:
+        - {order_id: o1, review_id: r_new, review_score: 4, reviews_for_order: 2}
+        - {order_id: o2, review_id: r_only, review_score: 5, reviews_for_order: 1}

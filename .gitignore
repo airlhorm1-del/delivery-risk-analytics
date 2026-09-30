@@ -1,0 +1,32 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Secrets: never commit credentials. BigQuery uses `gcloud auth application-default login` instead of key files.
+.env
+*service-account*.json
+*-credentials.json
+
+# Data is rebuilt by the pipeline (run_pipeline.py downloads and calls the APIs), so only the README is tracked.
+data/*
+!data/README.md
+
+# Generated Parquet files for Power BI (rebuilt by analysis/export_powerbi.py)
+powerbi/data/
+
+# dbt build output and installed packages
+dbt/target/
+dbt/target_bigquery/
+dbt/dbt_packages/
+dbt/logs/
+dbt/.user.yml
+logs/
+
+# Editors / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

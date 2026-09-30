@@ -1,0 +1,28 @@
+state_code,state_name,region,capital,capital_latitude,capital_longitude
+AC,Acre,North,Rio Branco,-9.9747,-67.8100
+AL,Alagoas,Northeast,Maceió,-9.6658,-35.7353
+AM,Amazonas,North,Manaus,-3.1190,-60.0217
+AP,Amapá,North,Macapá,0.0349,-51.0694
+BA,Bahia,Northeast,Salvador,-12.9714,-38.5014
+CE,Ceará,Northeast,Fortaleza,-3.7319,-38.5267
+DF,Distrito Federal,Central-West,Brasília,-15.7939,-47.8828
+ES,Espírito Santo,Southeast,Vitória,-20.3155,-40.3128
+GO,Goiás,Central-West,Goiânia,-16.6869,-49.2648
+MA,Maranhão,Northeast,São Luís,-2.5307,-44.3068
+MG,Minas Gerais,Southeast,Belo Horizonte,-19.9167,-43.9345
+MS,Mato Grosso do Sul,Central-West,Campo Grande,-20.4697,-54.6201
+MT,Mato Grosso,Central-West,Cuiabá,-15.6014,-56.0979
+PA,Pará,North,Belém,-1.4558,-48.4902
+PB,Paraíba,Northeast,João Pessoa,-7.1195,-34.8450
+PE,Pernambuco,Northeast,Recife,-8.0476,-34.8770
+PI,Piauí,Northeast,Teresina,-5.0920,-42.8038
+PR,Paraná,South,Curitiba,-25.4284,-49.2733
+RJ,Rio de Janeiro,Southeast,Rio de Janeiro,-22.9068,-43.1729
+RN,Rio Grande do Norte,Northeast,Natal,-5.7945,-35.2110
+RO,Rondônia,North,Porto Velho,-8.7612,-63.9004
+RR,Roraima,North,Boa Vista,2.8235,-60.6758
+RS,Rio Grande do Sul,South,Porto Alegre,-30.0346,-51.2177
+SC,Santa Catarina,South,Florianópolis,-27.5954,-48.5480
+SE,Sergipe,Northeast,Aracaju,-10.9472,-37.0731
+SP,São Paulo,Southeast,São Paulo,-23.5505,-46.6333
+TO,Tocantins,North,Palmas,-10.1840,-48.3336

@@ -1,0 +1,13 @@
+{
+  "name": "Delivery Risk",
+  "dataColors": ["#2F5D8A", "#D9822B", "#B8442C", "#9AA5B1", "#5B8DB8", "#E8B04A", "#6C8E5B", "#8C6BB1"],
+  "good": "#2F5D8A",
+  "neutral": "#9AA5B1",
+  "bad": "#B8442C",
+  "maximum": "#B8442C",
+  "center": "#F3E3D3",
+  "minimum": "#FFFFFF",
+  "background": "#FFFFFF",
+  "foreground": "#1F2933",
+  "tableAccent": "#2F5D8A"
+}

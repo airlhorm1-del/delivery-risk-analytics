@@ -1,0 +1,39 @@
+version: 2
+
+sources:
+  - name: olist
+    description: Olist Brazilian e-commerce public dataset (Kaggle), loaded unchanged with every column as text.
+    schema: raw
+    tables:
+      - name: olist_orders
+        description: One row per order, with its status and lifecycle timestamps.
+        columns:
+          - name: order_id
+            data_tests: [unique, not_null]
+      - name: olist_order_items
+        description: One row per item in an order. Each item has its own seller and shipping deadline.
+      - name: olist_order_payments
+        description: One row per payment method used on an order (orders can be split across methods).
+      - name: olist_order_reviews
+        description: Customer satisfaction survey answers, sent when the order arrives or is due.
+      - name: olist_customers
+        description: One row per order-customer id; customer_unique_id identifies the person.
+        columns:
+          - name: customer_id
+            data_tests: [unique, not_null]
+      - name: olist_sellers
+      - name: olist_products
+      - name: olist_geolocation
+        description: Zip-code prefixes with many latitude/longitude points each (about 1 million rows).
+      - name: olist_category_translation
+
+  - name: external
+    description: Public APIs landed by the Python extractors (ingestion/), one NDJSON record per row.
+    schema: raw
+    tables:
+      - name: holidays
+        description: Nager.Date public holidays for Brazil, 2016-2018.
+      - name: weather_daily
+        description: Open-Meteo daily weather at each state capital.
+      - name: fx_rates
+        description: ECB reference rates via Frankfurter, 1 EUR = rate BRL, working days only.

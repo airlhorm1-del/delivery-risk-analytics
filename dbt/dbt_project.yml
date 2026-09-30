@@ -1,0 +1,44 @@
+name: delivery_risk
+version: "1.0.0"
+config-version: 2
+profile: delivery_risk
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+analysis-paths: ["analyses"]
+clean-targets: ["target", "dbt_packages"]
+
+flags:
+  send_anonymous_usage_stats: false
+
+# The first and last day any source can touch: orders start Sep 2016, promised dates end Nov 2018.
+vars:
+  calendar_start: "2016-09-01"
+  calendar_end: "2018-12-31"
+  # The data export was taken on this day; orders still open after their promised date are overdue as of it.
+  data_cutoff_date: "2018-10-17"
+  # Complete months used for headline KPIs and trends (2016 and Sep-Oct 2018 hold only a few hundred orders).
+  kpi_window_start: "2017-01-01"
+  kpi_window_end: "2018-08-31"
+  # A day with at least this much rain (mm) counts as a heavy-rain day.
+  heavy_rain_mm: 20
+  # Minimum orders before a seller or route is ranked, so tiny samples do not top the lists.
+  min_orders_for_ranking: 30
+
+models:
+  delivery_risk:
+    staging:
+      +schema: staging
+      +materialized: view
+    intermediate:
+      +schema: intermediate
+      +materialized: view
+    marts:
+      +schema: marts
+      +materialized: table
+
+seeds:
+  delivery_risk:
+    +schema: reference

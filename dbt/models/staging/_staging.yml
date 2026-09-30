@@ -1,0 +1,153 @@
+version: 2
+
+models:
+  - name: stg_olist__orders
+    description: One row per order with typed lifecycle timestamps. Nothing removed.
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+      - name: order_status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [delivered, shipped, canceled, unavailable, invoiced, processing, created, approved]
+      - name: purchased_at
+        data_tests: [not_null]
+      - name: shipped_at
+        description: When the seller handed the parcel to the carrier (Olist's "delivered to carrier" date).
+      - name: promised_date
+        description: The delivery date promised to the customer at checkout.
+        data_tests: [not_null]
+
+  - name: stg_olist__order_items
+    description: One row per item. Money in BRL.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [order_id, order_item_number]
+    columns:
+      - name: order_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_olist__orders')
+                field: order_id
+      - name: seller_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_olist__sellers')
+                field: seller_id
+      - name: product_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_olist__products')
+                field: product_id
+      - name: shipping_limit_at
+        description: Deadline for the seller to hand the item to the carrier.
+      - name: price_brl
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: false
+      - name: freight_brl
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+
+  - name: stg_olist__order_payments
+    description: One row per payment method used on an order.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [order_id, payment_sequence]
+    columns:
+      - name: payment_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [credit_card, boleto, voucher, debit_card, not_defined]
+
+  - name: stg_olist__order_reviews
+    description: Review rows as received. An order can have several; see int_order_reviews_latest.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [review_id, order_id]
+    columns:
+      - name: review_score
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                max_value: 5
+
+  - name: stg_olist__customers
+    columns:
+      - name: customer_id
+        data_tests: [unique, not_null]
+      - name: customer_state
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('brazil_states')
+                field: state_code
+
+  - name: stg_olist__sellers
+    columns:
+      - name: seller_id
+        data_tests: [unique, not_null]
+      - name: seller_state
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('brazil_states')
+                field: state_code
+
+  - name: stg_olist__products
+    columns:
+      - name: product_id
+        data_tests: [unique, not_null]
+
+  - name: stg_olist__category_translation
+    columns:
+      - name: category_name_pt
+        data_tests: [unique, not_null]
+
+  - name: stg_olist__geolocation
+    columns:
+      - name: is_inside_brazil
+        description: False for the few points geocoded outside Brazil's borders; excluded from centroids.
+
+  - name: stg_external__holidays
+    columns:
+      - name: holiday_date
+        data_tests: [not_null]
+
+  - name: stg_external__weather
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [state_code, weather_date]
+    columns:
+      - name: precipitation_mm
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+
+  - name: stg_external__fx_rates
+    columns:
+      - name: rate_date
+        data_tests: [unique, not_null]
+      - name: brl_per_eur
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 2
+                max_value: 8

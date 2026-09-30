@@ -1,0 +1,42 @@
+# Runs on every push and pull request: code checks first, then the whole pipeline from scratch on
+# DuckDB (download, APIs, load, 30 dbt models with 99 tests, independent verification).
+# Nothing here needs a password: the BigQuery steps run only on the owner's laptop.
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install Python and dependencies (exact versions from uv.lock)
+        run: uv sync --locked
+
+      - name: Lint and format check
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - name: Unit tests (Python)
+        run: uv run pytest
+
+      - name: Full pipeline on DuckDB, including dbt tests and verification
+        run: uv run python run_pipeline.py
+
+      - name: Keep the results for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: results
+          path: |
+            docs/results/
+            docs/images/
