@@ -11,7 +11,11 @@ renamed as (
         cast(review_score as {{ dbt.type_int() }}) as review_score,
         coalesce(trim(review_comment_message) <> '', false) as has_comment,
         cast(cast(review_creation_date as {{ dbt.type_timestamp() }}) as date) as review_sent_date,
-        cast(review_answer_timestamp as {{ dbt.type_timestamp() }}) as review_answered_at
+        cast(review_answer_timestamp as {{ dbt.type_timestamp() }}) as review_answered_at,
+        -- Which feed the row came from (see int_order_reviews_unioned).
+        'olist' as data_source,
+        false as is_synthetic,
+        cast(null as {{ dbt.type_timestamp() }}) as sim_as_of
     from source
 )
 

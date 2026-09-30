@@ -9,7 +9,7 @@ Run from the project root:
     uv run python -m ingestion.load_bigquery
 
 Like the DuckDB loader, CSV columns are loaded as text (STRING) and typed later in dbt.
-Each run replaces the tables (WRITE_TRUNCATE), so it is safe to repeat. Data stays in the
+Each run drops and re-creates the tables, so it is safe to repeat and resets the sandbox's 60-day expiry. Data stays in the
 EU multi-region unless BQ_LOCATION says otherwise; dbt's prod target uses the same setting.
 """
 
@@ -70,6 +70,9 @@ def combined_ndjson(table: RawTable) -> io.BytesIO:
 
 def load_table(client: bigquery.Client, table: RawTable, dataset_id: str) -> int:
     table_id = f"{dataset_id}.{table.name}"
+    # Drop and re-create rather than overwrite: in the BigQuery sandbox a table expires 60 days after it
+    # was *created*, so re-creating it on every (daily) run keeps the raw data from ever expiring.
+    client.delete_table(table_id, not_found_ok=True)
     if table.file_format == "csv":
         with table.files()[0].open("rb") as file:
             job = client.load_table_from_file(file, table_id, job_config=csv_job_config(csv_header(table)))

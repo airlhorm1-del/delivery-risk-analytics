@@ -1,7 +1,7 @@
 -- One review per order. 547 orders were reviewed more than once; the most recent answer wins,
 -- because it reflects how the customer felt last.
 with reviews as (
-    select * from {{ ref('stg_olist__order_reviews') }}
+    select * from {{ ref('int_order_reviews_unioned') }}
 ),
 
 ranked as (

@@ -50,6 +50,34 @@ route's past delivery times performed about the same as Olist's own
 Full numbers: [docs/results/02_findings.md](docs/results/02_findings.md). The stage-by-stage story:
 [docs/WALKTHROUGH.md](docs/WALKTHROUGH.md).
 
+## Simulated live orders (SYNTHETIC DATA)
+
+> **The orders dated 2026 are simulated, not real.** They exist to show the pipeline running as a live
+> system (new data every day, orders changing status, missed days caught up). All results above use the
+> real 2017-2018 Olist orders only.
+
+A simulator (`simulator/`) learns what a normal Olist day looked like (orders per weekday and season,
+purchase hours, Black Friday, payment clearing, outcomes, reviews) and acts as a live shop. Every morning
+at 07:00 a scheduled run:
+
+- adds the orders "placed" since the last run (about 210 a day), dated today in Sao Paulo time, and fills in
+  any days missed while the laptop was off;
+- moves earlier orders on: payment approved, shipped, delivered on time or late, reviewed;
+- uses today's real data: the ECB exchange rate, recent weather at the 27 state capitals, 2026-27
+  holidays for the bank calendar, and Brazil's official inflation index (IPCA) to bring 2017-18 prices
+  to today's reais;
+- rebuilds and tests everything, then refreshes BigQuery.
+
+Each simulated order copies one real order's basket and journey shape, then gets a new date, IDs, prices,
+payment clearing on today's calendar, an outcome and a review. A validation compares 14 measures of four
+simulated months with the real data (late rate, delivery days, weekday and hour patterns, reviews and
+more): all are within tolerance ([docs/results/04_simulator_validation.md](docs/results/04_simulator_validation.md)).
+
+![Simulator validation](docs/images/06_simulator_validation.png)
+
+Labelled everywhere: `sim-` order IDs, separate `raw.sim_*` tables, and `data_source = 'simulated'` /
+`is_synthetic = true` on every row. dbt tests fail if a synthetic row ever reaches the headline KPIs.
+
 ## Architecture
 
 ```mermaid
@@ -59,21 +87,27 @@ flowchart LR
         H[Nager.Date API<br/>holidays]
         W[Open-Meteo API<br/>weather]
         F[Frankfurter API<br/>ECB EUR/BRL]
+        B[Banco Central API<br/>inflation]
     end
+    SIM[Simulator<br/>SYNTHETIC live orders]
     subgraph Python["Python (ingestion/)"]
         E[extract, validate,<br/>stamp lineage]
     end
     subgraph Warehouse["Warehouse: BigQuery (prod) / DuckDB (dev)"]
         R[(raw)] --> S[(staging)] --> I[(intermediate)] --> M[(marts<br/>star schema)]
     end
-    K & H & W & F --> E --> R
+    K & H & W & F & B --> E --> R
+    K -. patterns .-> SIM
+    B -. prices .-> SIM
+    SIM --> R
     M --> P[Power BI]
     M --> A[analysis + independent check]
 ```
 
 | Layer | What happens | Where |
 |---|---|---|
-| Extract | Download Olist; call 3 public APIs with retries, validation and lineage fields | `ingestion/` |
+| Extract | Download Olist; call 4 public APIs with retries, validation and lineage fields | `ingestion/` |
+| Simulate | Simulated live orders (SYNTHETIC) in the Olist format, re-created up to "now" on every run | `simulator/` |
 | Load | Land files unchanged in the `raw` schema, all CSV columns as text, row counts checked | `ingestion/load_*.py` |
 | Staging | Types, clear names, one model per source table | `dbt/models/staging/` |
 | Intermediate | Business rules: delivery outcome, stage timings, latest review, EUR rates, holidays and rain per order | `dbt/models/intermediate/` |
@@ -88,11 +122,16 @@ warehouse-specific macros.
 
 ## Quality checks
 
-- **96 dbt data tests:** keys unique and not null, relationships between tables, accepted values and
-  ranges, and reconciliations (e.g. GMV in the fact table equals the raw file to the cent).
-- **3 dbt unit tests** pin down the business rules with hand-made examples: delivered on the promised
-  day = on time; weekend exchange rate = Friday's; latest review wins.
-- **23 Python unit tests** for the extractors and loaders (offline).
+- **129 dbt data tests:** keys unique and not null, relationships between tables, accepted values and
+  ranges, reconciliations (e.g. GMV in the fact table equals the raw files to the cent), and the fence
+  between real and synthetic data (no simulated order may reach the headline KPIs; no simulated event
+  may lie in the future).
+- **4 dbt unit tests** pin down the business rules with hand-made examples: delivered on the promised
+  day = on time; weekend exchange rate = Friday's; latest review wins; a simulated order is overdue only
+  once its promise has passed at its snapshot time.
+- **34 Python unit tests** for the extractors, loaders and simulator (offline), e.g. the same day always
+  gives the same simulated orders, and boleto payments clear only on bank days.
+- **Simulator validation:** 14 measures of simulated orders compared with the real data, all within tolerance.
 - **Independent verification:** `analysis/verify.py` recomputes 10 headline numbers from the raw files
   with pandas, without any SQL. All 10 match the warehouse exactly.
 - **Two warehouses, one answer:** the same dbt project runs on DuckDB and on BigQuery (EU). Headline
@@ -104,9 +143,13 @@ warehouse-specific macros.
 Requires [uv](https://docs.astral.sh/uv/).
 
 ```bash
-uv sync                               # Python 3.12 + exact library versions from uv.lock
-uv run python run_pipeline.py         # download, APIs, load, dbt build + tests, analysis, checks (~2 min)
+uv sync                                   # Python 3.12 + exact library versions from uv.lock
+uv run python run_pipeline.py             # download, APIs, simulator, load, dbt build + tests, analysis, checks (~3 min)
+uv run python run_pipeline.py --daily     # the daily run: today's API data + simulated live orders (~1.5 min)
 ```
+
+Daily at 07:00 on Windows: `scripts/register_daily_task.ps1` (remove with `scripts/unregister_daily_task.ps1`).
+Moving the daily run to GitHub Actions: [docs/OPTION_B_PLAN.md](docs/OPTION_B_PLAN.md).
 
 Cloud warehouse: log in once with `gcloud auth application-default login`, set `GCP_PROJECT_ID`,
 then run `uv run python run_pipeline.py --bigquery`. Dashboard: [powerbi/DASHBOARD_GUIDE.md](powerbi/DASHBOARD_GUIDE.md).
@@ -118,6 +161,8 @@ then run `uv run python run_pipeline.py --bigquery`. Dashboard: [powerbi/DASHBOA
 - Weather is measured at each state capital, not the customer's city.
 - Driver effects compare like with like (same state, same week). They are not a causal model.
 - The public holiday API lists only one state-level holiday for Brazil, so holidays are mostly national.
+- The 2026 orders are simulated. They copy real 2017-18 orders, so they show the same patterns and add no new
+  evidence about the real world.
 
 ## Data sources and attribution
 

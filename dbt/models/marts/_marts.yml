@@ -4,12 +4,20 @@ models:
   # ---------- Star schema (Power BI connects to these) ----------
   - name: fct_orders
     description: >
-      One row per order (all 99,441). Route, stage timings, delivery outcome, money in BRL and EUR,
-      review, and outside conditions. Filter on is_in_kpi_window for headline numbers.
+      One row per order: all 99,441 real Olist orders plus the simulated live orders (SYNTHETIC DATA,
+      is_synthetic = true). Route, stage timings, delivery outcome, money in BRL and EUR, review, and
+      outside conditions. Headline numbers filter on is_in_kpi_window, which is never true for synthetic rows.
     data_tests:
       - dbt_utils.equal_rowcount:
           arguments:
-            compare_model: ref('stg_olist__orders')
+            compare_model: ref('int_orders_unioned')
+      # The fence between real and synthetic data: no simulated order may ever reach the headline KPIs.
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "not (is_synthetic and is_in_kpi_window)"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "(data_source = 'simulated') = is_synthetic"
       - dbt_utils.expression_is_true:
           arguments:
             expression: "revenue_at_risk_eur <= gmv_eur and late_gmv_eur <= gmv_eur"
@@ -87,7 +95,12 @@ models:
       - name: heavy_rain_days_first_7_days_transit
         description: Days with 20 mm+ rain at the customer's state capital in the 7 days from hand-over.
       - name: is_in_kpi_window
-        description: Purchased between 2017-01-01 and 2018-08-31 (the complete months).
+        description: A real Olist order purchased between 2017-01-01 and 2018-08-31 (the complete months).
+      - name: is_synthetic
+        description: True for simulated live orders (SYNTHETIC DATA from simulator/run.py).
+        data_tests: [not_null]
+      - name: sim_as_of
+        description: For simulated orders, the moment their snapshot shows; null for real orders.
 
   - name: fct_order_items
     description: One row per order item, for seller and product analysis. Delivery results are copied from the order.
@@ -159,4 +172,13 @@ models:
       plus how many days the condition adds to the delivery and to the promise.
     columns:
       - name: driver
+        data_tests: [unique, not_null]
+
+  # ---------- SYNTHETIC DATA: simulated live orders ----------
+  - name: mart_live_daily
+    description: >
+      SYNTHETIC DATA. One row per day of the simulated live shop: what was ordered that day and what has
+      happened to those orders by the latest run (delivered, late, still in transit, overdue).
+    columns:
+      - name: purchase_date
         data_tests: [unique, not_null]

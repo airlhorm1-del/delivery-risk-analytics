@@ -14,7 +14,11 @@ renamed as (
         cast(nullif(order_delivered_carrier_date, '') as {{ dbt.type_timestamp() }}) as shipped_at,
         cast(nullif(order_delivered_customer_date, '') as {{ dbt.type_timestamp() }}) as delivered_at,
         -- The promised date is always midnight in the source, so it is a date, not a time.
-        cast(cast(order_estimated_delivery_date as {{ dbt.type_timestamp() }}) as date) as promised_date
+        cast(cast(order_estimated_delivery_date as {{ dbt.type_timestamp() }}) as date) as promised_date,
+        -- Which feed the row came from (see int_orders_unioned).
+        'olist' as data_source,
+        false as is_synthetic,
+        cast(null as {{ dbt.type_timestamp() }}) as sim_as_of
     from source
 )
 

@@ -12,7 +12,11 @@ renamed as (
         -- The deadline for the seller to hand this item to the carrier.
         cast(shipping_limit_date as {{ dbt.type_timestamp() }}) as shipping_limit_at,
         cast(price as {{ dbt.type_numeric() }}) as price_brl,
-        cast(freight_value as {{ dbt.type_numeric() }}) as freight_brl
+        cast(freight_value as {{ dbt.type_numeric() }}) as freight_brl,
+        -- Which feed the row came from (see int_order_items_unioned).
+        'olist' as data_source,
+        false as is_synthetic,
+        cast(null as {{ dbt.type_timestamp() }}) as sim_as_of
     from source
 )
 

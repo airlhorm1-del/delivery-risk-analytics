@@ -1,7 +1,8 @@
--- One EUR/BRL rate for every calendar day. The ECB publishes on working days only, so weekends and
--- holidays carry forward the last published rate (the standard accounting convention).
+-- One EUR/BRL rate for every calendar day from Sep 2016 to today (the simulated live orders need today's
+-- rate). The ECB publishes on working days only, so weekends and holidays carry forward the last published
+-- rate (the standard accounting convention).
 with calendar as (
-    {{ calendar_days(var('calendar_start'), var('calendar_end')) }}
+    {{ calendar_days(var('calendar_start'), var('calendar_end', run_started_at.strftime('%Y-%m-%d'))) }}
 ),
 
 days as (

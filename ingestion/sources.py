@@ -54,4 +54,11 @@ RAW_TABLES = [
     RawTable("holidays", "holidays/holidays_BR_*.ndjson", "ndjson"),
     RawTable("weather_daily", "weather/weather_*.ndjson", "ndjson"),
     RawTable("fx_rates", "fx/fx_EUR_BRL.ndjson", "ndjson"),
+    RawTable("ipca_monthly", "ipca/ipca_BR.ndjson", "ndjson"),
+    # SYNTHETIC DATA: the simulated live orders (simulator/run.py), in the Olist file format.
+    RawTable("sim_orders", "sim/sim_orders.csv", "csv"),
+    RawTable("sim_order_items", "sim/sim_order_items.csv", "csv"),
+    RawTable("sim_order_payments", "sim/sim_order_payments.csv", "csv"),
+    RawTable("sim_order_reviews", "sim/sim_order_reviews.csv", "csv"),
+    RawTable("sim_customers", "sim/sim_customers.csv", "csv"),
 ]

@@ -13,7 +13,8 @@ from analysis.common import RESULTS_DIR, connect, md_table, query
 
 CHECKS = {
     "Rows per raw table": """
-        select table_name as "table", estimated_size as "rows"
+        select table_name || case when table_name like 'sim_%' then ' (SYNTHETIC)' else '' end as "table",
+               estimated_size as "rows"
         from duckdb_tables() where schema_name = 'raw' order by table_name
     """,
     "Order status": """

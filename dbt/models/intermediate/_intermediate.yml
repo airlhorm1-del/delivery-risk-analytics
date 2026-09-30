@@ -1,6 +1,24 @@
 version: 2
 
 models:
+  - name: int_orders_unioned
+    description: Real Olist orders plus simulated live orders (SYNTHETIC DATA); data_source says which.
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+      - name: data_source
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [olist, simulated]
+  - name: int_order_items_unioned
+  - name: int_order_payments_unioned
+  - name: int_order_reviews_unioned
+  - name: int_customers_unioned
+    columns:
+      - name: customer_id
+        data_tests: [unique, not_null]
+
   - name: int_fx_rates_daily
     description: One EUR/BRL rate per calendar day; weekends and holidays carry the last published rate.
     columns:
@@ -69,7 +87,7 @@ unit_tests:
       only once their promised date has passed before the data cut-off (2018-10-17).
     model: int_order_timeline
     given:
-      - input: ref('stg_olist__orders')
+      - input: ref('int_orders_unioned')
         rows:
           - {order_id: on_promised_day, customer_id: c1, order_status: delivered, purchased_at: "2018-01-01 10:00:00", approved_at: "2018-01-01 10:20:00", shipped_at: "2018-01-03 09:00:00", delivered_at: "2018-01-10 18:30:00", promised_date: "2018-01-10"}
           - {order_id: one_day_late, customer_id: c2, order_status: delivered, purchased_at: "2018-01-01 10:00:00", approved_at: "2018-01-01 10:20:00", shipped_at: "2018-01-03 09:00:00", delivered_at: "2018-01-11 08:00:00", promised_date: "2018-01-10"}
@@ -115,7 +133,7 @@ unit_tests:
   - name: latest_review_wins_when_an_order_has_several
     model: int_order_reviews_latest
     given:
-      - input: ref('stg_olist__order_reviews')
+      - input: ref('int_order_reviews_unioned')
         rows:
           - {review_id: r_old, order_id: o1, review_score: 1, has_comment: true, review_sent_date: "2018-01-10", review_answered_at: "2018-01-11 09:00:00"}
           - {review_id: r_new, order_id: o1, review_score: 4, has_comment: false, review_sent_date: "2018-01-15", review_answered_at: "2018-01-16 09:00:00"}
@@ -124,3 +142,22 @@ unit_tests:
       rows:
         - {order_id: o1, review_id: r_new, review_score: 4, reviews_for_order: 2}
         - {order_id: o2, review_id: r_only, review_score: 5, reviews_for_order: 1}
+
+  - name: simulated_orders_are_judged_at_their_snapshot_time
+    description: >
+      A simulated order is overdue once its promised date is before the moment the snapshot shows
+      (sim_as_of), not before the 2018 Olist export date; until then it is still open.
+    model: int_order_timeline
+    given:
+      - input: ref('int_orders_unioned')
+        rows:
+          - {order_id: sim-in-transit, customer_id: c1, data_source: simulated, is_synthetic: true, sim_as_of: "2026-10-10 02:00:00", order_status: shipped, purchased_at: "2026-09-20 10:00:00", approved_at: "2026-09-20 10:20:00", shipped_at: "2026-09-23 09:00:00", delivered_at: null, promised_date: "2026-10-15"}
+          - {order_id: sim-overdue, customer_id: c2, data_source: simulated, is_synthetic: true, sim_as_of: "2026-10-10 02:00:00", order_status: shipped, purchased_at: "2026-09-01 10:00:00", approved_at: "2026-09-01 10:20:00", shipped_at: "2026-09-03 09:00:00", delivered_at: null, promised_date: "2026-10-01"}
+      - input: ref('int_order_items_summary')
+        rows:
+          - {order_id: sim-in-transit, seller_ship_by_at: "2026-09-26 10:20:00"}
+          - {order_id: sim-overdue, seller_ship_by_at: "2026-09-07 10:20:00"}
+    expect:
+      rows:
+        - {order_id: sim-in-transit, delivery_outcome: "Open, not yet due", is_synthetic: true}
+        - {order_id: sim-overdue, delivery_outcome: "Overdue, not delivered", is_synthetic: true}

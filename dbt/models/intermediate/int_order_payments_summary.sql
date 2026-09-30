@@ -1,6 +1,6 @@
 -- One row per order: how it was paid. The main payment type is the method that paid the most.
 with payments as (
-    select * from {{ ref('stg_olist__order_payments') }}
+    select * from {{ ref('int_order_payments_unioned') }}
 ),
 
 ranked as (

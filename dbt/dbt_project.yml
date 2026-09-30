@@ -16,8 +16,9 @@ flags:
 # The first and last day any source can touch: orders start Sep 2016, promised dates end Nov 2018.
 vars:
   calendar_start: "2016-09-01"
-  calendar_end: "2018-12-31"
-  # The data export was taken on this day; orders still open after their promised date are overdue as of it.
+  # calendar_end defaults to today (see int_fx_rates_daily), because the simulated live orders are dated today.
+  # The Olist export was taken on this day; its open orders past their promised date are overdue as of it.
+  # (Simulated orders use the moment their snapshot shows, sim_as_of, instead.)
   data_cutoff_date: "2018-10-17"
   # Complete months used for headline KPIs and trends (2016 and Sep-Oct 2018 hold only a few hundred orders).
   kpi_window_start: "2017-01-01"

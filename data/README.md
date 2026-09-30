@@ -8,8 +8,11 @@ data/
 ├── raw/                    # landing zone: files exactly as the sources sent them
 │   ├── olist/              # 9 CSVs from Kaggle + _manifest.json (sizes, row counts, SHA-256 hashes)
 │   ├── holidays/           # Nager.Date, one NDJSON file per year
-│   ├── weather/            # Open-Meteo, one NDJSON file per state capital
-│   └── fx/                 # ECB EUR/BRL reference rates via Frankfurter
+│   ├── weather/            # Open-Meteo, one NDJSON file per state capital (weather_live_*: recent days)
+│   ├── fx/                 # ECB EUR/BRL reference rates via Frankfurter, 2016 to today
+│   ├── ipca/               # Brazil's monthly inflation (Banco Central do Brasil)
+│   └── sim/                # SYNTHETIC: simulated live orders in the Olist format (simulator/run.py)
+├── sim/                    # simulator cache (order templates) and run_log.csv (one line per run)
 └── warehouse/
     └── delivery_risk.duckdb   # local warehouse: raw, staging, intermediate and marts schemas
 ```

@@ -35,7 +35,7 @@ plt.rcParams.update(
 BACKTEST_SQL = """
 with delivered as (
     select route, customer_state, purchase_date, promised_days, actual_days, is_late
-    from marts.fct_orders where is_delivered and route is not null
+    from marts.fct_orders where is_delivered and route is not null and data_source = 'olist'
 ),
 train as (select * from delivered where purchase_date between '2017-01-01' and '2017-12-31'),
 test as (select * from delivered where purchase_date between '2018-01-01' and '2018-08-31'),

@@ -151,3 +151,103 @@ models:
               arguments:
                 min_value: 2
                 max_value: 8
+
+  - name: stg_external__ipca
+    description: Monthly IPCA inflation, one row per month.
+    columns:
+      - name: month_start
+        data_tests: [unique, not_null]
+      - name: pct_change
+        data_tests: [not_null]
+
+  # ---------- SYNTHETIC DATA: the simulated live feed ----------
+  - name: stg_simulated__orders
+    description: SYNTHETIC DATA. Simulated orders as of their snapshot time (sim_as_of).
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "order_id like 'sim-%' and is_synthetic and data_source = 'simulated'"
+      # Events happen in a possible order...
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: >
+              (approved_at is null or approved_at >= purchased_at)
+              and (shipped_at is null or shipped_at >= approved_at)
+              and (delivered_at is null or delivered_at >= shipped_at)
+      # ...and nothing after the moment the snapshot shows.
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: >
+              purchased_at <= sim_as_of and (approved_at is null or approved_at <= sim_as_of)
+              and (shipped_at is null or shipped_at <= sim_as_of) and (delivered_at is null or delivered_at <= sim_as_of)
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+      - name: order_status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [created, approved, invoiced, processing, shipped, delivered, canceled, unavailable]
+
+  - name: stg_simulated__order_items
+    description: SYNTHETIC DATA. Items copied from real Olist baskets, prices raised by Brazilian inflation (IPCA).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [order_id, order_item_number]
+    columns:
+      - name: order_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_simulated__orders')
+                field: order_id
+      - name: seller_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_olist__sellers')
+                field: seller_id
+      - name: product_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_olist__products')
+                field: product_id
+
+  - name: stg_simulated__order_payments
+    description: SYNTHETIC DATA.
+    columns:
+      - name: payment_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [credit_card, boleto, voucher, debit_card, not_defined]
+
+  - name: stg_simulated__order_reviews
+    description: SYNTHETIC DATA. Only reviews answered by the snapshot time appear.
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "review_answered_at <= sim_as_of"
+    columns:
+      - name: review_id
+        data_tests: [unique, not_null]
+      - name: review_score
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                max_value: 5
+
+  - name: stg_simulated__customers
+    description: SYNTHETIC DATA. One new synthetic customer per simulated order, at a real customer location.
+    columns:
+      - name: customer_id
+        data_tests: [unique, not_null]
+      - name: customer_state
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('brazil_states')
+                field: state_code

@@ -1,5 +1,6 @@
 # Runs on every push and pull request: code checks first, then the whole pipeline from scratch on
-# DuckDB (download, APIs, load, 30 dbt models with 99 tests, independent verification).
+# DuckDB (download, APIs, simulated live orders, load, 42 dbt models with 133 tests, independent
+# verification, simulator validation).
 # Nothing here needs a password: the BigQuery steps run only on the owner's laptop.
 name: CI
 

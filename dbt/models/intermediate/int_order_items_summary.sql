@@ -2,7 +2,7 @@
 -- 1.3% of orders have several sellers; the primary seller is the one with the highest item value,
 -- so every order can be placed on one seller-to-customer route.
 with items as (
-    select * from {{ ref('stg_olist__order_items') }}
+    select * from {{ ref('int_order_items_unioned') }}
 ),
 
 per_seller as (

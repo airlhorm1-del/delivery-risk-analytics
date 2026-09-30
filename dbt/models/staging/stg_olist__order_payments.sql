@@ -10,7 +10,11 @@ renamed as (
         -- boleto = Brazilian bank payment slip, paid at a bank or online and confirmed a day or more later.
         payment_type,
         cast(payment_installments as {{ dbt.type_int() }}) as installments,
-        cast(payment_value as {{ dbt.type_numeric() }}) as payment_brl
+        cast(payment_value as {{ dbt.type_numeric() }}) as payment_brl,
+        -- Which feed the row came from (see int_order_payments_unioned).
+        'olist' as data_source,
+        false as is_synthetic,
+        cast(null as {{ dbt.type_timestamp() }}) as sim_as_of
     from source
 )
 

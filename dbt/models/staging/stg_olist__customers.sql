@@ -10,7 +10,11 @@ renamed as (
         -- Kept as text: prefixes such as 01001 (Sao Paulo city) would lose their leading zero as numbers.
         customer_zip_code_prefix as customer_zip_prefix,
         customer_city,
-        upper(customer_state) as customer_state
+        upper(customer_state) as customer_state,
+        -- Which feed the row came from (see int_customers_unioned).
+        'olist' as data_source,
+        false as is_synthetic,
+        cast(null as {{ dbt.type_timestamp() }}) as sim_as_of
     from source
 )
 

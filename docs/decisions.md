@@ -76,3 +76,25 @@ Short records of design choices: what was decided, what else was considered, and
 
 **Decision:** Route-based promises (a percentile of each route's 2017 delivery times) were back-tested on Jan-Aug 2018 against Olist's actual promises before being recommended.
 **Result:** At the same average promise length, the route rule performs about the same as Olist's own (Olist: 23.4 days, 7.7% late; route P95: 25.6 days, 5.4% late; route P90: 20.6 days, 10.2% late). So the recommendation is *not* "replace the promise formula" but "fix the specific failures" (seller hand-over, a few routes, peaks, boleto). Testing a hypothesis and reporting that it failed is part of the result.
+
+## 015: Simulated live orders: copy real orders, re-time them on today's calendar
+
+**Decision:** A simulator (`simulator/`) acts as a live shop. Each simulated order copies one real delivered Olist order from the normal months (its basket and the shape of its journey: promise, seller deadline, hand-over and transit times) and gives it a new date, new IDs, prices raised by official Brazilian inflation (IPCA), a payment that clears on today's bank calendar, a Christmas-season slowdown, an outcome and a review. Daily volume, purchase hours, payment clearing, outcome rates and review behaviour are learned from the real data into `simulator/model/sim_model.json`.
+**What went wrong first:** the first version drew promise, hand-over and transit times separately from per-route distributions. The validation (`simulator/validate.py`) showed 9.3% late orders against 4.2% in reality, and too many missed seller deadlines. Drawing the timings separately broke the links between them (a bulky order to a remote town gets a long promise *and* a long journey). Copying each real order's whole journey fixed it: all 14 validation measures are now within tolerance.
+**Why copy rather than invent:** the simulated data has to look like Olist's, so the pipeline, tests and dashboard can treat it as one more feed. Copying real combinations is the simplest way to be realistic, and the validation proves it.
+
+## 016: The simulated shop is re-created on every run (no stored state)
+
+**Decision:** Each day of the simulated shop has a fixed random seed. Every run re-creates every day from 2 Jul 2026 up to "now" (Sao Paulo time) and reveals only the events that have happened by then.
+**Why:** No state file can get lost or corrupted. Missed days (laptop off) fill in automatically. Running twice gives identical data. A fresh GitHub machine (Option B) can rebuild the whole simulated history from the model file alone. Trade-off: refitting the model rewrites the simulated history, which is acceptable for synthetic data and is why the model file is committed.
+
+## 017: Synthetic data is labelled everywhere and fenced out of the findings
+
+**Decision:** Simulated rows have `sim-` IDs, their own raw tables (`raw.sim_*`) and staging models (`stg_simulated__*`), and `data_source = 'simulated'`, `is_synthetic = true` and `sim_as_of` on every row. They join the real data only in the `int_*_unioned` models. `is_in_kpi_window`, which every finding and headline KPI uses, is only ever true for real Olist orders.
+**How it is enforced:** dbt tests fail if a synthetic row is in the KPI window, if a simulated ID does not start with `sim-`, if a simulated event lies after its snapshot time, or if events are out of order. The independent verification still matches 10 of 10 numbers, and the findings file is unchanged.
+
+## 018: Daily schedule: Windows Task Scheduler now (Option A), GitHub Actions + BigQuery later (Option B)
+
+**Decision (Option A):** A Windows scheduled task runs `scripts/run_daily.ps1` at 07:00 under the owner's account: today's API data, the simulator, DuckDB build and tests, the independent verification, the Parquet export, then BigQuery. If the laptop is off at 07:00, it runs at the next opportunity. It uses the Google login already saved on the laptop, so no credentials are stored in the project.
+**Sandbox expiry:** sandbox tables expire 60 days after they are *created*, so the loader drops and re-creates every raw table, and dbt runs with `--full-refresh` to re-create the seeds. The daily run therefore keeps everything fresh.
+**Option B (planned, not built):** see `docs/OPTION_B_PLAN.md`.

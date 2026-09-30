@@ -1,7 +1,7 @@
 -- The delivery rules in one place: how long each stage took, whether the promise was kept, and
 -- (for late orders) whose stage it was. Unit-tested in _intermediate.yml.
 with orders as (
-    select * from {{ ref('stg_olist__orders') }}
+    select * from {{ ref('int_orders_unioned') }}
 ),
 
 items as (
@@ -39,6 +39,9 @@ measured as (
 select
     order_id,
     customer_id,
+    data_source,
+    is_synthetic,
+    sim_as_of,
     order_status,
     purchased_at,
     approved_at,
@@ -68,7 +71,9 @@ select
         when is_delivered then 'On time'
         when order_status in ('canceled', 'unavailable') then 'Cancelled'
         when order_status = 'delivered' then 'Delivered, date missing'
-        when promised_date < cast('{{ var("data_cutoff_date") }}' as date) then 'Overdue, not delivered'
+        -- "Overdue" is judged at the moment the data shows: the Olist export date, or the simulated snapshot time.
+        when promised_date < coalesce(cast(sim_as_of as date), cast('{{ var("data_cutoff_date") }}' as date))
+            then 'Overdue, not delivered'
         else 'Open, not yet due'
     end as delivery_outcome,
 

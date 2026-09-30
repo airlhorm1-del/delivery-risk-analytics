@@ -2,6 +2,8 @@
 
 Why: Olist prices are in Brazilian reais (BRL). The dashboard reports in euros for a
 German audience, so each order is converted at the ECB rate of its purchase date.
+The range runs from 2016 to today, so the simulated live orders get today's real rate too
+(one call; the ECB publishes around 16:00 CET, so a morning run uses the previous day's rate).
 
 We land the rate exactly as the ECB publishes it (1 EUR = x BRL, e.g. 3.4305) rather
 than asking the API for the inverse, so the raw layer matches the official source.
@@ -22,7 +24,7 @@ from datetime import date
 
 import requests
 
-from ingestion.config import ANALYSIS_END_DATE, ANALYSIS_START_DATE, FRANKFURTER_BASE_URL, PROJECT_ROOT, RAW_DATA_DIR
+from ingestion.config import ANALYSIS_START_DATE, FRANKFURTER_BASE_URL, PROJECT_ROOT, RAW_DATA_DIR
 from ingestion.http_client import DEFAULT_TIMEOUT_SECONDS, build_session
 from ingestion.landing import add_lineage, configure_logging, utc_now_iso, write_ndjson
 
@@ -30,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 OUTPUT_PATH = RAW_DATA_DIR / "fx" / "fx_EUR_BRL.ndjson"
 BASE, QUOTE = "EUR", "BRL"
-# EUR/BRL traded between about 3.0 and 5.0 in 2016-2018. A value far outside this means a broken response.
+# EUR/BRL traded between about 3.0 and 6.5 from 2016 to 2026. A value far outside this means a broken response.
 PLAUSIBLE_RATE = (2.0, 8.0)
 # Longest normal gap between ECB publications (Christmas to the first working day of January).
 MAX_GAP_DAYS = 5
@@ -69,7 +71,8 @@ def to_records(payload: dict, start: date, end: date) -> list[dict]:
     return records
 
 
-def run(start: date = ANALYSIS_START_DATE, end: date = ANALYSIS_END_DATE) -> int:
+def run(start: date = ANALYSIS_START_DATE, end: date | None = None) -> int:
+    end = end or date.today()
     with build_session() as session:
         payload, url = fetch_rates(session, start, end)
     records = to_records(payload, start, end)

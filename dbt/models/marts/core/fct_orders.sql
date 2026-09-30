@@ -1,12 +1,13 @@
 -- The central fact table: one row per order with its route, timings, outcome, money (BRL and EUR),
--- customer review and outside conditions. Every Olist order is kept (99,441); filter on
--- is_in_kpi_window for headline numbers.
+-- customer review and outside conditions. Every Olist order is kept (99,441), plus the simulated live
+-- orders (SYNTHETIC DATA, is_synthetic = true). Headline numbers use is_in_kpi_window, which is only
+-- ever true for real Olist orders.
 with timeline as (
     select * from {{ ref('int_order_timeline') }}
 ),
 
 customers as (
-    select * from {{ ref('stg_olist__customers') }}
+    select * from {{ ref('int_customers_unioned') }}
 ),
 
 items as (
@@ -44,6 +45,9 @@ states as (
 joined as (
     select
         timeline.order_id,
+        timeline.data_source,
+        timeline.is_synthetic,
+        timeline.sim_as_of,
         customers.customer_unique_id,
         customers.customer_city,
         customers.customer_state,
@@ -98,7 +102,8 @@ joined as (
         context.heavy_rain_days_first_7_days_transit,
         context.rain_mm_first_7_days_transit,
 
-        timeline.purchase_date between cast('{{ var("kpi_window_start") }}' as date)
+        timeline.data_source = 'olist'
+            and timeline.purchase_date between cast('{{ var("kpi_window_start") }}' as date)
             and cast('{{ var("kpi_window_end") }}' as date) as is_in_kpi_window
     from timeline
     inner join customers on customers.customer_id = timeline.customer_id

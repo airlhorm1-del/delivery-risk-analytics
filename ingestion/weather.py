@@ -6,10 +6,13 @@ deliveries. The capital stands in for the whole state (a trade-off: one call per
 state instead of one per city; see docs/decisions.md).
 
 Run from the project root:
-    uv run python -m ingestion.weather
+    uv run python -m ingestion.weather              # historical window 2016-2018
+    uv run python -m ingestion.weather --live       # recent weather for the simulated live orders
     uv run python -m ingestion.weather --states SP RJ
 
-Output: one NDJSON file per state in data/raw/weather/, one day per line. The API
+Output: one NDJSON file per state in data/raw/weather/ (weather_SP.ndjson; live: weather_live_SP.ndjson),
+one day per line. The most recent days can still be empty in the archive; in live mode those
+trailing empty days are left out and arrive on a later run. The API
 returns columns ({"time": [...], "precipitation_sum": [...]}); we reshape them into
 rows but keep the API's own field names and units. Renaming happens in SQL.
 """
@@ -28,6 +31,7 @@ from ingestion.config import (
     ANALYSIS_END_DATE,
     ANALYSIS_START_DATE,
     BRAZIL_STATES_CSV,
+    LIVE_WEATHER_START_DATE,
     OPEN_METEO_ARCHIVE_URL,
     PROJECT_ROOT,
     RAW_DATA_DIR,
@@ -42,6 +46,8 @@ DAILY_VARIABLES = ["precipitation_sum", "temperature_2m_max", "temperature_2m_mi
 # Open-Meteo's free tier allows 600 calls a minute, and a long date range counts as several calls.
 # A short pause between states keeps the whole run well inside that limit.
 PAUSE_BETWEEN_CALLS_SECONDS = 2.0
+# In live mode, how many days the archive may trail behind yesterday before we give up.
+MAX_ARCHIVE_LAG_DAYS = 5
 
 
 def load_states() -> list[dict]:
@@ -90,7 +96,22 @@ def to_records(payload: dict, state_code: str, start: date, end: date) -> list[d
     ]
 
 
-def run(state_codes: list[str] | None = None, start: date = ANALYSIS_START_DATE, end: date = ANALYSIS_END_DATE) -> int:
+def drop_trailing_empty_days(records: list[dict]) -> list[dict]:
+    """The archive publishes the last few days with a short delay; stop at the last day that has rain data."""
+    while records and records[-1]["precipitation_sum"] is None:
+        records = records[:-1]
+    return records
+
+
+def run(
+    state_codes: list[str] | None = None,
+    start: date = ANALYSIS_START_DATE,
+    end: date = ANALYSIS_END_DATE,
+    live: bool = False,
+) -> int:
+    if live:
+        # Yesterday is the latest complete day. The archive can lag a little more, so step back if it refuses.
+        start, end = LIVE_WEATHER_START_DATE, date.today() - timedelta(days=1)
     states = [state for state in load_states() if not state_codes or state["state_code"] in state_codes]
     ingested_at = utc_now_iso()
     total = 0
@@ -99,11 +120,25 @@ def run(state_codes: list[str] | None = None, start: date = ANALYSIS_START_DATE,
             if position:
                 time.sleep(PAUSE_BETWEEN_CALLS_SECONDS)
             code = state["state_code"]
-            payload, url = fetch_weather(
-                session, float(state["capital_latitude"]), float(state["capital_longitude"]), start, end
-            )
+            latitude, longitude = float(state["capital_latitude"]), float(state["capital_longitude"])
+            for days_back in range(MAX_ARCHIVE_LAG_DAYS if live else 1):
+                try:
+                    payload, url = fetch_weather(session, latitude, longitude, start, end)
+                    break
+                except requests.HTTPError as error:
+                    if (
+                        not live
+                        or error.response is None
+                        or error.response.status_code != 400
+                        or days_back == MAX_ARCHIVE_LAG_DAYS - 1
+                    ):
+                        raise
+                    end -= timedelta(days=1)
+                    logger.info("Archive has no data for %s yet; trying up to %s", end + timedelta(days=1), end)
             records = to_records(payload, code, start, end)
-            path = OUTPUT_DIR / f"weather_{code}.ndjson"
+            if live:
+                records = drop_trailing_empty_days(records)
+            path = OUTPUT_DIR / f"weather_{'live_' if live else ''}{code}.ndjson"
             write_ndjson(add_lineage(records, url, ingested_at), path)
             missing_rain = sum(1 for record in records if record["precipitation_sum"] is None)
             logger.info(
@@ -121,9 +156,10 @@ def run(state_codes: list[str] | None = None, start: date = ANALYSIS_START_DATE,
 def main() -> None:
     parser = argparse.ArgumentParser(description="Land daily weather for Brazil's state capitals as NDJSON.")
     parser.add_argument("--states", nargs="+", help="Two-letter state codes (default: all 27).")
+    parser.add_argument("--live", action="store_true", help="Recent weather (for the simulated live orders).")
     args = parser.parse_args()
     configure_logging()
-    run([code.upper() for code in args.states] if args.states else None)
+    run([code.upper() for code in args.states] if args.states else None, live=args.live)
 
 
 if __name__ == "__main__":

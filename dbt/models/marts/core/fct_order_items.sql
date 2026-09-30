@@ -1,7 +1,7 @@
 -- One row per order item, so sellers and product categories get their own share of each order.
 -- Delivery results are order-level (Olist records one delivery per order) and are copied onto each item.
 with items as (
-    select * from {{ ref('stg_olist__order_items') }}
+    select * from {{ ref('int_order_items_unioned') }}
 ),
 
 orders as (
@@ -16,6 +16,8 @@ select
     {{ dbt_utils.generate_surrogate_key(['items.order_id', 'items.order_item_number']) }} as order_item_key,
     items.order_id,
     items.order_item_number,
+    orders.data_source,
+    orders.is_synthetic,
     items.product_id,
     items.seller_id,
     sellers.seller_state,

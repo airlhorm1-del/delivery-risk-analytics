@@ -14,7 +14,7 @@ with orders as (
         timeline.shipped_date,
         customers.customer_state
     from {{ ref('int_order_timeline') }} as timeline
-    inner join {{ ref('stg_olist__customers') }} as customers
+    inner join {{ ref('int_customers_unioned') }} as customers
         on customers.customer_id = timeline.customer_id
 ),
 

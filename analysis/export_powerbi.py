@@ -25,6 +25,7 @@ TABLES = [
     "mart_route_performance",
     "mart_seller_performance",
     "mart_late_drivers",
+    "mart_live_daily",  # SYNTHETIC DATA: the simulated live shop
 ]
 
 

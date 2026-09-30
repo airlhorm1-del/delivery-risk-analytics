@@ -36,4 +36,21 @@ sources:
       - name: weather_daily
         description: Open-Meteo daily weather at each state capital.
       - name: fx_rates
-        description: ECB reference rates via Frankfurter, 1 EUR = rate BRL, working days only.
+        description: ECB reference rates via Frankfurter, 1 EUR = rate BRL, working days only, Sep 2016 to today.
+      - name: ipca_monthly
+        description: Brazil's monthly consumer price inflation (IPCA) from Banco Central do Brasil; used by the simulator to bring 2017-18 prices to today's reais.
+
+  - name: simulated
+    description: >
+      SYNTHETIC DATA. Simulated live orders written by simulator/run.py in the Olist file format, re-created
+      on every run up to "now". Every row has data_source = 'simulated', is_synthetic = true and sim_as_of.
+    schema: raw
+    tables:
+      - name: sim_orders
+        columns:
+          - name: order_id
+            data_tests: [unique, not_null]
+      - name: sim_order_items
+      - name: sim_order_payments
+      - name: sim_order_reviews
+      - name: sim_customers
