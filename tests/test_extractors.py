@@ -6,7 +6,7 @@ from datetime import date
 import pytest
 
 from ingestion import fx, weather
-from ingestion.load_bigquery import combined_ndjson, csv_job_config, ndjson_job_config
+from ingestion.load_bigquery import combined_ndjson, csv_header, csv_job_config, ndjson_job_config
 from ingestion.sources import RAW_TABLES, RawTable
 
 # ---------- FX ----------
@@ -128,3 +128,12 @@ def test_several_ndjson_files_are_combined_into_one_upload(tmp_path, monkeypatch
     monkeypatch.setattr(RawTable, "files", lambda self, raw_dir=tmp_path: sorted(tmp_path.glob(self.pattern)))
     lines = combined_ndjson(table).read().decode("utf-8").splitlines()
     assert [json.loads(line)["state_code"] for line in lines] == ["AC", "AL"]
+
+
+def test_csv_header_ignores_byte_order_mark(tmp_path, monkeypatch):
+    byte_order_mark = b"\xef\xbb\xbf"
+    content = b"product_category_name,product_category_name_english\nbeleza_saude,health_beauty\n"
+    (tmp_path / "translation.csv").write_bytes(byte_order_mark + content)
+    table = RawTable("olist_category_translation", "translation.csv", "csv")
+    monkeypatch.setattr(RawTable, "files", lambda self, raw_dir=tmp_path: sorted(tmp_path.glob(self.pattern)))
+    assert csv_header(table) == ["product_category_name", "product_category_name_english"]

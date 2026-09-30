@@ -15,8 +15,8 @@ with orders as (
     select
         order_id,
         customer_state,
-        cast({{ dbt.dateadd('day', '1 - ' ~ iso_day_of_week('purchase_date'), 'purchase_date') }} as date) as purchase_week,
-        cast({{ dbt.dateadd('day', '1 - ' ~ iso_day_of_week('shipped_date'), 'shipped_date') }} as date) as shipped_week,
+        cast({{ dbt.dateadd('day', '(1 - ' ~ iso_day_of_week('purchase_date') ~ ')', 'purchase_date') }} as date) as purchase_week,
+        cast({{ dbt.dateadd('day', '(1 - ' ~ iso_day_of_week('shipped_date') ~ ')', 'shipped_date') }} as date) as shipped_week,
         case when is_late then 1 else 0 end as late,
         promised_days,
         actual_days,

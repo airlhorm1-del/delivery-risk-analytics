@@ -32,7 +32,9 @@ DEFAULT_LOCATION = "EU"
 
 
 def csv_header(table: RawTable) -> list[str]:
-    with table.files()[0].open(encoding="utf-8", newline="") as file:
+    # utf-8-sig drops the invisible byte-order mark that starts product_category_name_translation.csv;
+    # otherwise BigQuery sees the mark as part of the first column name and rejects it as invalid.
+    with table.files()[0].open(encoding="utf-8-sig", newline="") as file:
         return next(csv.reader(file))
 
 

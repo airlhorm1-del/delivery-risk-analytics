@@ -92,9 +92,11 @@ warehouse-specific macros.
   ranges, and reconciliations (e.g. GMV in the fact table equals the raw file to the cent).
 - **3 dbt unit tests** pin down the business rules with hand-made examples: delivered on the promised
   day = on time; weekend exchange rate = Friday's; latest review wins.
-- **22 Python unit tests** for the extractors and loaders (offline).
+- **23 Python unit tests** for the extractors and loaders (offline).
 - **Independent verification:** `analysis/verify.py` recomputes 10 headline numbers from the raw files
   with pandas, without any SQL. All 10 match the warehouse exactly.
+- **Two warehouses, one answer:** the same dbt project runs on DuckDB and on BigQuery (EU). Headline
+  numbers, driver effects and route rankings are identical on both.
 - **CI:** every push runs lint, tests and the whole pipeline from scratch on GitHub Actions.
 
 ## Run it
