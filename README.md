@@ -47,8 +47,8 @@ Not recommended: replacing the promise formula. Back-tested on 2018 orders, prom
 route's past delivery times performed about the same as Olist's own
 ([decision 014](docs/decisions.md)).
 
-Full numbers: [docs/results/02_findings.md](docs/results/02_findings.md). The stage-by-stage story:
-[docs/WALKTHROUGH.md](docs/WALKTHROUGH.md).
+Full numbers: [docs/results/02_findings.md](docs/results/02_findings.md). Every design choice and why:
+[docs/decisions.md](docs/decisions.md).
 
 ## Simulated live orders (SYNTHETIC DATA)
 
@@ -100,7 +100,7 @@ flowchart LR
     K -. patterns .-> SIM
     B -. prices .-> SIM
     SIM --> R
-    M --> P[Power BI]
+    M --> P[Power BI data model + DAX]
     M --> A[analysis + independent check]
 ```
 
@@ -113,7 +113,7 @@ flowchart LR
 | Intermediate | Business rules: delivery outcome, stage timings, latest review, EUR rates, holidays and rain per order | `dbt/models/intermediate/` |
 | Marts | Star schema (`fct_orders`, `fct_order_items`, 4 dimensions) plus route, seller, monthly and driver tables | `dbt/models/marts/` |
 | Analysis | Findings, charts, promise back-test, independent recomputation in pandas | `analysis/` |
-| Dashboard | Power BI on the marts | `powerbi/` |
+| Power BI | Data model, relationships and 18 DAX measures on the marts | `powerbi/` |
 
 SQL techniques used: CTEs throughout, window functions (`row_number` for de-duplication,
 `last_value ... ignore nulls` to carry exchange rates over weekends, rolling 3-month rates, `lag`,
@@ -149,10 +149,10 @@ uv run python run_pipeline.py --daily     # the daily run: today's API data + si
 ```
 
 Daily at 07:00 on Windows: `scripts/register_daily_task.ps1` (remove with `scripts/unregister_daily_task.ps1`).
-Moving the daily run to GitHub Actions: [docs/OPTION_B_PLAN.md](docs/OPTION_B_PLAN.md).
 
 Cloud warehouse: log in once with `gcloud auth application-default login`, set `GCP_PROJECT_ID`,
-then run `uv run python run_pipeline.py --bigquery`. Dashboard: [powerbi/DASHBOARD_GUIDE.md](powerbi/DASHBOARD_GUIDE.md).
+then run `uv run python run_pipeline.py --bigquery`. Power BI data model and measures:
+[powerbi/DASHBOARD_GUIDE.md](powerbi/DASHBOARD_GUIDE.md).
 
 ## Limitations
 
@@ -173,7 +173,6 @@ then run `uv run python run_pipeline.py --bigquery`. Dashboard: [powerbi/DASHBOA
 
 ## How this was built
 
-<!-- Owner: check this paragraph is accurate before publishing. -->
 Built with Claude Code, an AI coding assistant, which wrote the Python, the SQL and first drafts of
 the write-ups. I chose the business problem and the direction, drawing on my background in banking
 and logistics, and reviewed the findings, the design decisions and the numbers.

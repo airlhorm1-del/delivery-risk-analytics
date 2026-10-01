@@ -1,14 +1,13 @@
-# Power BI dashboard: build guide
+# Power BI: data model, DAX measures and report pages
 
-The dashboard reads the **marts** from the warehouse: a star schema (two fact tables, four dimension
+The report reads the **marts** from the warehouse: a star schema (two fact tables, four dimension
 tables) plus five small analysis tables. The fact tables hold the real Olist orders **and** the
 simulated live orders (SYNTHETIC DATA, `is_synthetic = true`); every page filters to one or the other. All business logic already lives in SQL, so the DAX below
-only adds things up. That means every number on the dashboard can be traced to a tested dbt model.
+only adds things up. That means every number in the report can be traced to a tested dbt model.
 
 ## 1. Connect to the data
 
-**Option A: BigQuery (the real setup).** Do the BigQuery steps in `docs/WALKTHROUGH.md` ("What you
-still need to do") first.
+**Option A: BigQuery (the real setup).** Run the pipeline with `--bigquery` first (see the README).
 
 1. Power BI Desktop > **Home > Get data > Google BigQuery** > Sign in with the same Google account.
 2. Open your project > dataset **marts** > tick the 10 tables below > **Load** (Import mode).
@@ -169,8 +168,7 @@ With the KPI-window filter on, the Overview cards must match `docs/results/02_fi
 
 If a card is off, check the report-level filter first, then the relationship on purchase_date.
 
-## 6. Publish for the portfolio
+## 6. Save and share
 
-Save as `powerbi/delivery_risk.pbix`. Take screenshots of each page into `docs/images/dashboard_*.png`
-and export **File > Export > PDF** to `powerbi/delivery_risk.pdf`, so people can see the dashboard
-without Power BI. (Publishing to the web needs a Power BI work account; screenshots and the PDF are enough.)
+Save as `powerbi/delivery_risk.pbix` and export **File > Export > PDF** to `powerbi/delivery_risk.pdf`,
+so the report can be read without Power BI.

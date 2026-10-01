@@ -30,3 +30,8 @@ logs/
 .idea/
 Thumbs.db
 .DS_Store
+
+# Personal working notes (kept on this laptop, not published)
+PLAN.md
+docs/WALKTHROUGH.md
+docs/OPTION_B_PLAN.md
