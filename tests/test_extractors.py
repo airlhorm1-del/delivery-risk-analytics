@@ -137,3 +137,52 @@ def test_csv_header_ignores_byte_order_mark(tmp_path, monkeypatch):
     table = RawTable("olist_category_translation", "translation.csv", "csv")
     monkeypatch.setattr(RawTable, "files", lambda self, raw_dir=tmp_path: sorted(tmp_path.glob(self.pattern)))
     assert csv_header(table) == ["product_category_name", "product_category_name_english"]
+
+
+# ---------- BigQuery upload retries ----------
+
+
+class FlakyClient:
+    """Fails the first `failures` uploads with the error BigQuery raised when the laptop slept mid-upload."""
+
+    def __init__(self, failures: int):
+        self.failures = failures
+        self.calls = 0
+
+    def load_table_from_file(self, file, table_id, job_config):
+        self.calls += 1
+        if self.calls <= self.failures:
+            from google.api_core.exceptions import NotFound
+
+            raise NotFound("upload session expired")
+
+        class Job:
+            def result(self):
+                return None
+
+        return Job()
+
+
+def test_failed_upload_is_retried_then_succeeds(tmp_path, monkeypatch):
+    from ingestion.load_bigquery import upload_with_retries
+
+    (tmp_path / "fx.ndjson").write_text('{"rate": 5.9}\n', encoding="utf-8")
+    table = RawTable("fx_rates", "fx.ndjson", "ndjson")
+    monkeypatch.setattr(RawTable, "files", lambda self, raw_dir=tmp_path: sorted(tmp_path.glob(self.pattern)))
+    client = FlakyClient(failures=2)
+    upload_with_retries(client, table, "raw.fx_rates", attempts=3, pause_seconds=0)
+    assert client.calls == 3
+
+
+def test_upload_gives_up_after_the_last_attempt(tmp_path, monkeypatch):
+    from google.api_core.exceptions import NotFound
+
+    from ingestion.load_bigquery import upload_with_retries
+
+    (tmp_path / "fx.ndjson").write_text('{"rate": 5.9}\n', encoding="utf-8")
+    table = RawTable("fx_rates", "fx.ndjson", "ndjson")
+    monkeypatch.setattr(RawTable, "files", lambda self, raw_dir=tmp_path: sorted(tmp_path.glob(self.pattern)))
+    client = FlakyClient(failures=5)
+    with pytest.raises(NotFound):
+        upload_with_retries(client, table, "raw.fx_rates", attempts=3, pause_seconds=0)
+    assert client.calls == 3
