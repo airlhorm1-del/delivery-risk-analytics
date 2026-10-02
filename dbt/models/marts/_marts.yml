@@ -121,7 +121,7 @@ models:
                 field: seller_id
 
   - name: dim_date
-    description: One row per day, 2016-09-01 to 2018-12-31, with nationwide holidays and the EUR/BRL rate.
+    description: One row per day from 2016-09-01 to the latest run (the simulated live orders run to today), with nationwide holidays and the EUR/BRL rate.
     columns:
       - name: date_day
         data_tests: [unique, not_null]

@@ -138,6 +138,9 @@ warehouse-specific macros.
   numbers, driver effects and route rankings are identical on both.
 - **CI:** every push runs lint, tests and the whole pipeline from scratch on GitHub Actions.
 
+Every data issue found and how it was resolved: [docs/DATA_QUALITY.md](docs/DATA_QUALITY.md).
+What each code file does: [docs/CODE_GUIDE.md](docs/CODE_GUIDE.md).
+
 ## Run it
 
 Requires [uv](https://docs.astral.sh/uv/).
