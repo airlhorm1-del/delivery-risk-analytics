@@ -10,8 +10,8 @@ Run from the project root:
 
 Like the DuckDB loader, CSV columns are loaded as text (STRING) and typed later in dbt.
 Each table is replaced in one step (WRITE_TRUNCATE): if an upload fails, the previous table stays in
-place. A failed upload is retried, and in the BigQuery sandbox the table's expiry date is pushed forward
-after every load, so the data never runs into the sandbox's 60-day limit. Data stays in the EU
+place. A failed upload is retried. In the BigQuery sandbox each table is re-created on every run (see
+recreate_from_upload), so it never reaches the sandbox's 60-day limit. Data stays in the EU
 multi-region unless BQ_LOCATION says otherwise; dbt's prod target uses the same setting.
 """
 
@@ -23,7 +23,6 @@ import io
 import logging
 import os
 import time
-from datetime import UTC, datetime, timedelta
 
 import requests
 from google.api_core import exceptions as google_errors
@@ -45,6 +44,8 @@ RETRYABLE_ERRORS = (
     requests.exceptions.ConnectionError,
     requests.exceptions.Timeout,
 )
+# Sandbox only: the upload lands in this side table first, then the real table is re-created from it.
+SIDE_TABLE_PREFIX = "_reload_"
 
 
 def csv_header(table: RawTable) -> list[str]:
@@ -114,20 +115,25 @@ def upload_with_retries(
             time.sleep(pause_seconds)
 
 
-def extend_expiry(client: bigquery.Client, table_id: str, keep_for_ms: int | None) -> None:
-    """In the sandbox, a table expires a fixed time after it was created, and replacing its contents
-    does not change that. So after each load, set the expiry to (almost) the maximum again."""
-    if not keep_for_ms:
-        return  # a dataset without default expiry (billing enabled): tables never expire, nothing to do
-    bq_table = client.get_table(table_id)
-    bq_table.expires = datetime.now(UTC) + timedelta(milliseconds=keep_for_ms) - timedelta(days=1)
-    client.update_table(bq_table, ["expires"])
+def recreate_from_upload(client: bigquery.Client, table: RawTable, table_id: str) -> None:
+    """Sandbox: a table expires 60 days after it was *created*. Overwriting it does not change that,
+    and its expiry cannot be pushed past creation + 60 days (3 Oct 2026: 403 "Billing has not been
+    enabled"). So the upload goes to a side table, and the real table is re-created from it in one
+    statement, as dbt does with its own tables: a fresh 60 days on every run. If the upload or the
+    statement fails, the previous table stays in place."""
+    dataset_id, name = table_id.split(".")
+    side_table_id = f"{dataset_id}.{SIDE_TABLE_PREFIX}{name}"
+    upload_with_retries(client, table, side_table_id)
+    client.query(f"CREATE OR REPLACE TABLE `{table_id}` AS SELECT * FROM `{side_table_id}`").result()
+    client.delete_table(side_table_id, not_found_ok=True)
 
 
-def load_table(client: bigquery.Client, table: RawTable, dataset_id: str, keep_for_ms: int | None = None) -> int:
+def load_table(client: bigquery.Client, table: RawTable, dataset_id: str, sandbox: bool = False) -> int:
     table_id = f"{dataset_id}.{table.name}"
-    upload_with_retries(client, table, table_id)
-    extend_expiry(client, table_id, keep_for_ms)
+    if sandbox:
+        recreate_from_upload(client, table, table_id)
+    else:
+        upload_with_retries(client, table, table_id)
 
     loaded = client.get_table(table_id).num_rows
     expected = table.source_row_count()
@@ -141,9 +147,10 @@ def run(project: str, location: str) -> None:
     dataset = bigquery.Dataset(f"{project}.{RAW_SCHEMA}")
     dataset.location = location
     dataset = client.create_dataset(dataset, exists_ok=True)
-    keep_for_ms = client.get_dataset(dataset.reference).default_table_expiration_ms
+    # Only the sandbox forces a default expiry on every dataset; with billing enabled there is none.
+    sandbox = bool(client.get_dataset(dataset.reference).default_table_expiration_ms)
     for table in RAW_TABLES:
-        rows = load_table(client, table, dataset.dataset_id, keep_for_ms)
+        rows = load_table(client, table, dataset.dataset_id, sandbox)
         logger.info("%s.%-28s %10s rows (matches source files)", RAW_SCHEMA, table.name, f"{rows:,}")
 
 

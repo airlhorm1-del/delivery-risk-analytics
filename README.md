@@ -129,7 +129,7 @@ warehouse-specific macros.
 - **4 dbt unit tests** pin down the business rules with hand-made examples: delivered on the promised
   day = on time; weekend exchange rate = Friday's; latest review wins; a simulated order is overdue only
   once its promise has passed at its snapshot time.
-- **39 Python unit tests** for the extractors, loaders and simulator (offline), e.g. the same day always
+- **40 Python unit tests** for the extractors, loaders and simulator (offline), e.g. the same day always
   gives the same simulated orders, and boleto payments clear only on bank days.
 - **Simulator validation:** 14 measures of simulated orders compared with the real data, all within tolerance.
 - **Independent verification:** `analysis/verify.py` recomputes 10 headline numbers from the raw files

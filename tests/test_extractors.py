@@ -250,3 +250,42 @@ def test_upload_gives_up_after_the_last_attempt(tmp_path, monkeypatch):
     with pytest.raises(NotFound):
         upload_with_retries(client, table, "raw.fx_rates", attempts=3, pause_seconds=0)
     assert client.calls == 3
+
+
+# ---------- BigQuery sandbox: re-create instead of overwrite ----------
+
+
+class RecordingClient:
+    """Records what the loader asks BigQuery to do, in order."""
+
+    def __init__(self):
+        self.steps = []
+
+    def load_table_from_file(self, file, table_id, job_config):
+        self.steps.append(("upload", table_id))
+        return self
+
+    def query(self, sql):
+        self.steps.append(("query", sql))
+        return self
+
+    def delete_table(self, table_id, not_found_ok=False):
+        self.steps.append(("delete", table_id))
+
+    def result(self):
+        return None
+
+
+def test_sandbox_table_is_recreated_from_a_side_table(tmp_path, monkeypatch):
+    from ingestion.load_bigquery import recreate_from_upload
+
+    (tmp_path / "fx.ndjson").write_text('{"rate": 5.9}\n', encoding="utf-8")
+    table = RawTable("fx_rates", "fx.ndjson", "ndjson")
+    monkeypatch.setattr(RawTable, "files", lambda self, raw_dir=tmp_path: sorted(tmp_path.glob(self.pattern)))
+    client = RecordingClient()
+    recreate_from_upload(client, table, "raw.fx_rates")
+    assert client.steps == [
+        ("upload", "raw._reload_fx_rates"),
+        ("query", "CREATE OR REPLACE TABLE `raw.fx_rates` AS SELECT * FROM `raw._reload_fx_rates`"),
+        ("delete", "raw._reload_fx_rates"),
+    ]

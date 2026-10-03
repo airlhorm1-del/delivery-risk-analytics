@@ -43,7 +43,7 @@ Full numbers: [results/01_data_profile.md](results/01_data_profile.md).
 |---|---|---|
 | 15 | The first version of the order simulator was 9.3% late instead of about 4.2% | Each simulated order now copies a real order's whole journey instead of drawing each timing separately; all 14 validation measures pass |
 | 16 | The weather archive refused "today" shortly after midnight | Live weather ends yesterday and steps back a day if the archive is not ready |
-| 17 | BigQuery sandbox tables expire 60 days after creation, even when overwritten | After each load, the table's expiry date is pushed forward |
+| 17 | BigQuery sandbox tables expire 60 days after creation, even when overwritten, and the expiry cannot be pushed further | Each raw table is re-created on every run from a freshly uploaded side table, so it always has 60 days left |
 | 18 | The first scheduled 07:00 run failed: the laptop slept in the middle of an upload and one table went missing | The daily script keeps Windows awake while it works, uploads retry three times, and tables are replaced in one step so a failed upload leaves the old data in place |
 
 ## 4. Real and simulated data are kept apart
@@ -59,7 +59,7 @@ simulated orders.
 |---|---|---|
 | 129 dbt data tests | Unique and non-missing keys, relationships between tables, accepted values and ranges, reconciliations to the raw files, the real/simulated fence | All pass |
 | 4 dbt unit tests | The business rules on hand-made examples (issues 4, 7, 14 and the simulated-order rule) | All pass |
-| 39 Python tests | Extractors, loaders and the simulator, offline | All pass |
+| 40 Python tests | Extractors, loaders and the simulator, offline | All pass |
 | Simulator validation | 14 measures of simulated orders against the real data | All within tolerance ([results/04_simulator_validation.md](results/04_simulator_validation.md)) |
 | Independent verification | 10 headline numbers recomputed from the raw files with pandas, no SQL | 10 of 10 match exactly ([results/03_verification.md](results/03_verification.md)) |
 | Two warehouses | The same dbt project on DuckDB and on BigQuery | Identical results |
