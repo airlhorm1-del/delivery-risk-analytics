@@ -37,7 +37,7 @@ cloud (`--bigquery`); the same code runs on both. `run_pipeline.py` stops at the
 | `holidays.py` | Brazilian public holidays from the Nager.Date API; checks the fields and the year of each holiday |
 | `weather.py` | Daily weather for the 27 state capitals from the Open-Meteo archive; checks no day is missing |
 | `fx.py` | Daily EUR/BRL rates (European Central Bank) from the Frankfurter API; rejects impossible rates and gaps |
-| `ipca.py` | Brazil's monthly inflation (IPCA) from the Banco Central do Brasil API, used to put simulated prices in today's money |
+| `ipca.py` | Brazil's monthly inflation (IPCA) from the Banco Central do Brasil API, used to put simulated prices in today's money. If that API is down it asks IBGE for the same figures; if both are down it keeps the saved series, as long as it is recent |
 | `sources.py` | The single list of which landed file becomes which raw table, used by both loaders so they cannot drift apart |
 
 ## 2. Simulate: `simulator/` (SYNTHETIC DATA)

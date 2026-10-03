@@ -12,7 +12,7 @@ in SQL (dbt), where it is versioned, tested and documented.
 | Nager.Date | Brazilian public holidays per year | Required fields present; every holiday dated inside the requested year; no holiday without a date |
 | Open-Meteo | Daily weather for the 27 state capitals | Every day of the window present for every capital; one row per capital and day; rainfall never negative |
 | Frankfurter (European Central Bank) | Daily EUR/BRL reference rates | Rate between 2 and 8 BRL per EUR; no gap of more than 5 days between rates; one rate per date |
-| Banco Central do Brasil | Monthly consumer price inflation (IPCA) | One row per month, no missing values |
+| Banco Central do Brasil (IBGE as backup) | Monthly consumer price inflation (IPCA) | Every monthly change between -3% and +5%; no missing months; latest month at most 3 months old. If both sources are down, the saved series is kept only if it passes the same age check |
 
 Bad data stops the run at this point instead of reaching the reports.
 
@@ -59,7 +59,7 @@ simulated orders.
 |---|---|---|
 | 129 dbt data tests | Unique and non-missing keys, relationships between tables, accepted values and ranges, reconciliations to the raw files, the real/simulated fence | All pass |
 | 4 dbt unit tests | The business rules on hand-made examples (issues 4, 7, 14 and the simulated-order rule) | All pass |
-| 34 Python tests | Extractors, loaders and the simulator, offline | All pass |
+| 39 Python tests | Extractors, loaders and the simulator, offline | All pass |
 | Simulator validation | 14 measures of simulated orders against the real data | All within tolerance ([results/04_simulator_validation.md](results/04_simulator_validation.md)) |
 | Independent verification | 10 headline numbers recomputed from the raw files with pandas, no SQL | 10 of 10 match exactly ([results/03_verification.md](results/03_verification.md)) |
 | Two warehouses | The same dbt project on DuckDB and on BigQuery | Identical results |

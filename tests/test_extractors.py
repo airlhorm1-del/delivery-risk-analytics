@@ -1,11 +1,12 @@
-"""Unit tests for the FX and weather extractors and the loaders' shared pieces. All offline."""
+"""Unit tests for the FX, weather and IPCA extractors and the loaders' shared pieces. All offline."""
 
 import json
 from datetime import date
 
 import pytest
+import requests
 
-from ingestion import fx, weather
+from ingestion import fx, ipca, weather
 from ingestion.load_bigquery import combined_ndjson, csv_header, csv_job_config, ndjson_job_config
 from ingestion.sources import RAW_TABLES, RawTable
 
@@ -92,6 +93,69 @@ def test_every_state_has_capital_coordinates():
     for state in states:
         assert -34 < float(state["capital_latitude"]) < 6
         assert -74 < float(state["capital_longitude"]) < -34
+
+
+# ---------- IPCA ----------
+
+
+def test_ipca_from_ibge_gives_the_same_records_as_the_central_bank():
+    ibge_payload = [
+        {"D3C": "Mês (Código)", "V": "Valor"},
+        {"D3C": "202607", "V": "0.07"},
+        {"D3C": "202608", "V": "-0.32"},
+    ]
+    bcb_payload = [{"data": "01/07/2026", "valor": "0.07"}, {"data": "01/08/2026", "valor": "-0.32"}]
+    today = date(2026, 10, 3)
+    assert ipca.to_records(ipca.ibge_to_bcb_rows(ibge_payload), today) == ipca.to_records(bcb_payload, today)
+
+
+def unreachable(session, start, end):
+    raise requests.ConnectionError("Failed to resolve host")
+
+
+def saved_series(path, last_month: str) -> str:
+    text = json.dumps({"month": last_month, "pct_change": -0.32, "_ingested_at": "2026-10-02T18:40:29+00:00"}) + "\n"
+    path.write_text(text, encoding="utf-8")
+    return text
+
+
+def test_ipca_uses_ibge_when_the_central_bank_is_down(tmp_path, monkeypatch):
+    monkeypatch.setattr(ipca, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(ipca, "OUTPUT_PATH", tmp_path / "ipca_BR.ndjson")
+    monkeypatch.setattr(ipca, "fetch_ipca", unreachable)
+    monkeypatch.setattr(
+        ipca, "fetch_ipca_ibge", lambda session, start, end: ([{"data": "01/08/2026", "valor": "-0.32"}], "ibge-url")
+    )
+    assert ipca.run(date(2026, 8, 1), date(2026, 10, 3)) == 1
+    assert json.loads((tmp_path / "ipca_BR.ndjson").read_text(encoding="utf-8"))["_source_url"] == "ibge-url"
+
+
+def test_ipca_keeps_the_saved_file_when_both_sources_are_down(tmp_path, monkeypatch):
+    path = tmp_path / "ipca_BR.ndjson"
+    before = saved_series(path, "2026-08")
+    monkeypatch.setattr(ipca, "OUTPUT_PATH", path)
+    monkeypatch.setattr(ipca, "fetch_ipca", unreachable)
+    monkeypatch.setattr(ipca, "fetch_ipca_ibge", unreachable)
+    assert ipca.run(date(2026, 8, 1), date(2026, 10, 3)) == 1
+    assert path.read_text(encoding="utf-8") == before
+
+
+def test_ipca_stops_when_both_sources_are_down_and_the_saved_file_is_too_old(tmp_path, monkeypatch):
+    path = tmp_path / "ipca_BR.ndjson"
+    saved_series(path, "2026-05")
+    monkeypatch.setattr(ipca, "OUTPUT_PATH", path)
+    monkeypatch.setattr(ipca, "fetch_ipca", unreachable)
+    monkeypatch.setattr(ipca, "fetch_ipca_ibge", unreachable)
+    with pytest.raises(RuntimeError, match="too old"):
+        ipca.run(date(2026, 1, 1), date(2026, 10, 3))
+
+
+def test_ipca_stops_when_both_sources_are_down_and_nothing_is_saved(tmp_path, monkeypatch):
+    monkeypatch.setattr(ipca, "OUTPUT_PATH", tmp_path / "ipca_BR.ndjson")
+    monkeypatch.setattr(ipca, "fetch_ipca", unreachable)
+    monkeypatch.setattr(ipca, "fetch_ipca_ibge", unreachable)
+    with pytest.raises(RuntimeError, match="no saved file"):
+        ipca.run(date(2026, 8, 1), date(2026, 10, 3))
 
 
 # ---------- Loaders ----------

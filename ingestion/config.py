@@ -26,6 +26,8 @@ OPEN_METEO_ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
 FRANKFURTER_BASE_URL = "https://api.frankfurter.dev/v1"
 # Banco Central do Brasil time-series API; series 433 = IPCA, Brazil's official monthly consumer price inflation.
 BCB_SGS_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados"
+# Backup for the same index from IBGE, which compiles IPCA (SIDRA table 1737, variable 63 = monthly change).
+IBGE_SIDRA_IPCA_URL = "https://apisidra.ibge.gov.br/values/t/1737/n1/all/v/63/p"
 
 # ---------- Simulated live orders (synthetic) ----------
 # The simulated shop runs on Brazilian time (Sao Paulo, UTC-3, no daylight saving since 2019).

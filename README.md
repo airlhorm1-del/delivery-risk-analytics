@@ -87,7 +87,7 @@ flowchart LR
         H[Nager.Date API<br/>holidays]
         W[Open-Meteo API<br/>weather]
         F[Frankfurter API<br/>ECB EUR/BRL]
-        B[Banco Central API<br/>inflation]
+        B[Banco Central API<br/>inflation, IBGE as backup]
     end
     SIM[Simulator<br/>SYNTHETIC live orders]
     subgraph Python["Python (ingestion/)"]
@@ -106,7 +106,7 @@ flowchart LR
 
 | Layer | What happens | Where |
 |---|---|---|
-| Extract | Download Olist; call 4 public APIs with retries, validation and lineage fields | `ingestion/` |
+| Extract | Download Olist; call 4 public APIs (plus IBGE as a backup for inflation) with retries, validation and lineage fields | `ingestion/` |
 | Simulate | Simulated live orders (SYNTHETIC) in the Olist format, re-created up to "now" on every run | `simulator/` |
 | Load | Land files unchanged in the `raw` schema, all CSV columns as text, row counts checked | `ingestion/load_*.py` |
 | Staging | Types, clear names, one model per source table | `dbt/models/staging/` |
@@ -129,7 +129,7 @@ warehouse-specific macros.
 - **4 dbt unit tests** pin down the business rules with hand-made examples: delivered on the promised
   day = on time; weekend exchange rate = Friday's; latest review wins; a simulated order is overdue only
   once its promise has passed at its snapshot time.
-- **34 Python unit tests** for the extractors, loaders and simulator (offline), e.g. the same day always
+- **39 Python unit tests** for the extractors, loaders and simulator (offline), e.g. the same day always
   gives the same simulated orders, and boleto payments clear only on bank days.
 - **Simulator validation:** 14 measures of simulated orders compared with the real data, all within tolerance.
 - **Independent verification:** `analysis/verify.py` recomputes 10 headline numbers from the raw files
@@ -173,6 +173,8 @@ then run `uv run python run_pipeline.py --bigquery`. Power BI data model and mea
 - [Nager.Date](https://date.nager.at): public holidays
 - [Open-Meteo](https://open-meteo.com): historical weather, CC BY 4.0
 - [Frankfurter](https://frankfurter.dev): European Central Bank reference rates
+- [Banco Central do Brasil](https://dadosabertos.bcb.gov.br): monthly inflation (IPCA), with
+  [IBGE](https://www.ibge.gov.br), which compiles the index, as the backup source
 
 ## How this was built
 

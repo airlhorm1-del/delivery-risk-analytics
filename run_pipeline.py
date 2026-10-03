@@ -80,7 +80,9 @@ def main() -> None:
         )
         run.step("Extract: EUR/BRL rates up to today (ECB via Frankfurter)", python_module("ingestion.fx"))
         run.step("Extract: recent weather (Open-Meteo)", python_module("ingestion.weather", "--live"))
-        run.step("Extract: Brazilian inflation (Banco Central do Brasil)", python_module("ingestion.ipca"))
+        run.step(
+            "Extract: Brazilian inflation (Banco Central do Brasil, IBGE as backup)", python_module("ingestion.ipca")
+        )
 
     run.step("Simulate: live orders up to now (SYNTHETIC DATA)", python_module("simulator.run"))
     run.step("Load: raw files -> DuckDB", python_module("ingestion.load_duckdb"))
