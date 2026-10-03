@@ -166,7 +166,7 @@ With the KPI-window filter on, the Overview cards must match `docs/results/02_fi
 | Revenue at Risk (EUR) | 264,032 |
 | Avg Review, late vs on time | 2.27 vs 4.29 |
 
-If a card is off, check the report-level filter first, then the relationship on purchase_date.
+If a card is off, check the page filter (`is_in_kpi_window` = True) first, then the relationship on purchase_date.
 
 ## 6. Save and share
 
