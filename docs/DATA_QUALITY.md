@@ -45,6 +45,7 @@ Full numbers: [results/01_data_profile.md](results/01_data_profile.md).
 | 16 | The weather archive refused "today" shortly after midnight | Live weather ends yesterday and steps back a day if the archive is not ready |
 | 17 | BigQuery sandbox tables expire 60 days after creation, even when overwritten, and the expiry cannot be pushed further | Each raw table is re-created on every run from a freshly uploaded side table, so it always has 60 days left |
 | 18 | The first scheduled 07:00 run failed: the laptop slept in the middle of an upload and one table went missing | The daily script keeps Windows awake while it works, uploads retry three times, and tables are replaced in one step so a failed upload leaves the old data in place |
+| 19 | On 3 Oct 2026 the Banco Central inflation API's address disappeared, which stopped the whole daily run | Inflation now also comes from IBGE, which compiles the index (same figures); if both are down, the saved series is kept as long as it is at most 3 months old |
 
 ## 4. Real and simulated data are kept apart
 
